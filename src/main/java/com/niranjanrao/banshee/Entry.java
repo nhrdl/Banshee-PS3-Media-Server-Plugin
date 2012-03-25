@@ -44,10 +44,6 @@ public class Entry extends DLNAResource {
 		if (!loaded) {
 			load();
 		}
-		System.out.printf("%s:%d\n", getName(), lst.size());
-		if (getName().equals(EntryType.Composer.name())) {
-			System.out.println("Gotcha!");
-		}
 		return lst;
 	}
 
@@ -85,7 +81,6 @@ public class Entry extends DLNAResource {
 
 				// boolean b1 = parent.type == item.type, b2 = parent.getName()
 				// .equals(val);
-				// System.out.printf("Checking entry type %s name %s %s %s\n",
 				// parent.type, parent.name, b1, b2);
 				if (parent.type == item.type && parent.getName().equals(val)) {
 					return true;

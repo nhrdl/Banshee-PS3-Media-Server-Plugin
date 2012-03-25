@@ -9,6 +9,9 @@ import net.pms.dlna.DLNAResource;
 import net.pms.formats.Format;
 import net.pms.formats.FormatFactory;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class TrackEntry extends DLNAResource {
 
 	private Track track;
@@ -38,14 +41,15 @@ public class TrackEntry extends DLNAResource {
 		return track.getSize();
 	}
 
+	Logger log = LoggerFactory.getLogger(TrackEntry.class);
+
 	@Override
 	public InputStream getInputStream() throws IOException {
 		try {
 			URL uri = new URL(track.getUri());
 			return uri.openStream();
 		} catch (Exception e) {
-			System.out.println(e.getMessage());
-			e.printStackTrace();
+			log.error("Error while reading file " + track.getUri(), e);
 			throw new IOException(e);
 		}
 	}

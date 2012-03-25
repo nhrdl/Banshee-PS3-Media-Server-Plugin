@@ -1,23 +1,31 @@
 package com.niranjanrao.banshee;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Properties;
 
 import javax.sql.DataSource;
 
+import net.pms.PMS;
 import net.pms.dlna.DLNAResource;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.sqlite.SQLiteDataSource;
 
 public class Banshee extends DLNAResource {
 
-	private DataSource dataSource;
+	Logger log = LoggerFactory.getLogger(Banshee.class);
+
+	// private DataSource dataSource;
 	private List<Track> tracks;
 	static Hashtable<EntryType, ITrackInfoExtractor> entryInfoTable = new Hashtable<EntryType, ITrackInfoExtractor>();
 	static Hashtable<String, TrackEntry> tracksData = new Hashtable<String, TrackEntry>();
@@ -28,51 +36,83 @@ public class Banshee extends DLNAResource {
 	};
 
 	private DataSource getDataSource() {
-		final SQLiteDataSource ds = new SQLiteDataSource();
-		final String filePath = "jdbc:sqlite:/home/niranjan/.config/banshee-1/banshee.db";
-		ds.setUrl(filePath);
-		return ds;
+		try {
+			final SQLiteDataSource ds = new SQLiteDataSource();
+			String pluginDir = PMS.getConfiguration().getPluginDirectory();
+			File config = new File(pluginDir + "/" + "banshee.cfg");
+			String filePath = null;
+
+			if (config.exists()) {
+				Properties props = new Properties();
+				InputStream in = null;
+				try {
+					in = new FileInputStream(config);
+					props.load(in);
+					String type = props.getProperty("type");
+					if (type.equals("Banshee")) {
+						filePath = props.getProperty("db");
+					}
+				} finally {
+					in.close();
+				}
+
+			} else {
+				String home = System.getProperty("user.home");
+				filePath = String.format("%s/.config/banshee-1/banshee.db",
+						home);
+			}
+			filePath = String.format("jdbc:sqlite:%s", filePath);
+			if (null != filePath) {
+				ds.setUrl(filePath);
+				return ds;
+			}
+		} catch (Exception e) {
+			log.error("Could not create datasource", e);
+			return null;
+		}
+		return null;
 	}
 
 	public Banshee() {
-		this.dataSource = getDataSource();
-		String sql = "SELECT a.Name as Artist, b.Title as Album, t.* FROM CoreTracks t left outer join  CoreArtists a on t.ArtistId = a.ArtistID left outer join CoreAlbums b on t.AlbumId = b.AlbumId "
-		// + "where upper(Artist) like '%BENNY DAYAL%'";
-		;
-		RowMapper<Track> mapper = new RowMapper<Track>() {
+		DataSource dataSource = getDataSource();
+		if (null == dataSource) {
+			log.error("Could not create datasource");
+		} else {
+			String sql = "SELECT a.Name as Artist, b.Title as Album, t.* FROM CoreTracks t left outer join  CoreArtists a on t.ArtistId = a.ArtistID left outer join CoreAlbums b on t.AlbumId = b.AlbumId "
+			// + "where upper(Artist) like '%BENNY DAYAL%'";
+			;
+			RowMapper<Track> mapper = new RowMapper<Track>() {
 
-			public Track mapRow(ResultSet arg0, int arg1) throws SQLException {
-				Track track = new Track();
-				for (EntryType t : EntryType.values()) {
-					track.addEntry(t, arg0.getString(t.name()));
+				public Track mapRow(ResultSet arg0, int arg1)
+						throws SQLException {
+					Track track = new Track();
+					for (EntryType t : EntryType.values()) {
+						track.addEntry(t, arg0.getString(t.name()));
+					}
+					track.setTrackId(arg0.getString("TrackID"));
+					track.setTitle(arg0.getString("Title"));
+					track.setUri(arg0.getString("Uri"));
+					track.setBitRate(arg0.getInt("BitRate"));
+					track.setDuration(arg0.getInt("Duration"));
+					track.setMimeType(arg0.getString("MimeType"));
+					track.setSize(arg0.getLong("FileSize"));
+					return track;
 				}
-				track.setTrackId(arg0.getString("TrackID"));
-				track.setTitle(arg0.getString("Title"));
-				track.setUri(arg0.getString("Uri"));
-				track.setBitRate(arg0.getInt("BitRate"));
-				track.setDuration(arg0.getInt("Duration"));
-				track.setMimeType(arg0.getString("MimeType"));
-				track.setSize(arg0.getLong("FileSize"));
-				return track;
+			};
+
+			this.tracks = loadData(dataSource, sql, mapper);
+
+			for (EntryType type : Banshee.entryInfoTable.keySet()) {
+				PredefinedEntry entry = new PredefinedEntry(type, tracks, this);
+				// children.add(entry);
+				addChild(entry);
+				// entry.load();
 			}
-		};
-
-		this.tracks = loadData(sql, mapper);
-
-		for (EntryType type : Banshee.entryInfoTable.keySet()) {
-			PredefinedEntry entry = new PredefinedEntry(type, tracks, this);
-			// children.add(entry);
-			addChild(entry);
-			// entry.load();
 		}
 	}
 
-	public <T> List<T> loadData(final String query, final RowMapper<T> mapper,
-			final Object... queryParams) {
-		System.out.println("Executing query " + query);
-		if (query.indexOf("where Artist = ") != -1) {
-			System.out.println("Got it");
-		}
+	public <T> List<T> loadData(DataSource dataSource, final String query,
+			final RowMapper<T> mapper, final Object... queryParams) {
 		final JdbcTemplate select = new JdbcTemplate(dataSource);
 		return select.query(query, queryParams, mapper);
 	}
