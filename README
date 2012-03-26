@@ -1,0 +1,17 @@
+This is banshee plugin for PS3 media server. It reads data from banshee database and displays media entries under Banshee folder when you use your DLNA capable device with PS3 media server.
+
+Plugin is slightly intellegent in the sense it allows you to filter the data. You start with basic folders Albums/Artists/Year/Composers etc. If you select Artist, rest of the entries are filtered by that Artist. So, for example, you will see albums where that artist appears as well as years etc.
+
+Tested with Banshee 2.2.1 on ubuntu 11.10. PS3 Media server was built from latest sources on github using  Java 1.6. DLNA working was tested on Samsun tablet device.
+
+Compilation:
+If you need to compile sources, make sure PS3 media server is available in local maven repository. Execute mvn package command.
+
+Configuration:
+Plugin looks for banshee.cfg in plugins directory of PS3 media server. If the file exists, it will look for following entries
+#Datasource Type
+type=Banshee
+#DB Path
+db=<path to your banshee db file>
+
+If the config file does not exists, plugin will try to load banshee db from from default banshee db location - ~/.config/banshee-1/banshee.db
